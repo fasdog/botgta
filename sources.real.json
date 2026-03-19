@@ -1,0 +1,58 @@
+[
+  {
+    "name": "GTALens Gun Van",
+    "url": "https://gtalens.com/map/gun-vans",
+    "category_hint": "gunvan",
+    "title_selector": "h1, h2, h3",
+    "text_selector": "body",
+    "max_items": 1
+  },
+  {
+    "name": "GTALens Street Dealers",
+    "url": "https://gtalens.com/map/street-dealers",
+    "category_hint": "dealers",
+    "title_selector": "h1, h2, h3",
+    "text_selector": "body",
+    "max_items": 1
+  },
+  {
+    "name": "GTALens Stash Houses",
+    "url": "https://gtalens.com/map/stash-houses",
+    "category_hint": "stash",
+    "title_selector": "h1, h2, h3",
+    "text_selector": "body",
+    "max_items": 1
+  },
+  {
+    "name": "GTALens Shipwrecks",
+    "url": "https://gtalens.com/map/ship-wrecks",
+    "category_hint": "shipwreck",
+    "title_selector": "h1, h2, h3",
+    "text_selector": "body",
+    "max_items": 1
+  },
+  {
+    "name": "GTALens Hidden Caches",
+    "url": "https://gtalens.com/map/hidden-caches",
+    "category_hint": "caches",
+    "title_selector": "h1, h2, h3",
+    "text_selector": "body",
+    "max_items": 1
+  },
+  {
+    "name": "GTALens Buried Stashes",
+    "url": "https://gtalens.com/map/buried-stashes",
+    "category_hint": "caches",
+    "title_selector": "h1, h2, h3",
+    "text_selector": "body",
+    "max_items": 1
+  },
+  {
+    "name": "GTALens Treasure Chests",
+    "url": "https://gtalens.com/map/cayo-treasure-chests",
+    "category_hint": "caches",
+    "title_selector": "h1, h2, h3",
+    "text_selector": "body",
+    "max_items": 1
+  }
+]

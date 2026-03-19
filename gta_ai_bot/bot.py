@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 
 
-class GTAAIDiscordBot(commands.Bot):
+class GTANewsBot(commands.Bot):
     def __init__(self, settings: Settings):
         intents = discord.Intents.default()
         intents.message_content = True
@@ -40,11 +40,9 @@ class GTAAIDiscordBot(commands.Bot):
         timeout = aiohttp.ClientTimeout(total=self.settings.request_timeout_seconds)
         self.http_session = aiohttp.ClientSession(
             timeout=timeout,
-            headers={"User-Agent": "gta-ai-discord-bot/3.0"},
+            headers={"User-Agent": "gta-news-bot/3.2"},
         )
-
         self.aggregator = GTAAIAggregator(self.settings.max_source_text_chars)
-
         self.poll_sources.change_interval(minutes=max(1, self.settings.poll_minutes))
         self.poll_sources.start()
 
@@ -82,7 +80,7 @@ class GTAAIDiscordBot(commands.Bot):
                     "Режим: полностью бесплатный, без OpenAI.\n"
                     "Бот сам читает источники и публикует обновления.\n\n"
                     "**Команды просмотра:**\n"
-                    "`!gta` `!news` `!weekly` `!status`"
+                    "`!gta` `!news` `!weekly`"
                 ),
                 color=0x2ECC71,
                 timestamp=discord.utils.utcnow(),
@@ -178,7 +176,7 @@ class GTAAIDiscordBot(commands.Bot):
 
 
 settings = Settings.from_env()
-bot = GTAAIDiscordBot(settings)
+bot = GTANewsBot(settings)
 
 
 def make_state_embed(key: str):
@@ -246,34 +244,13 @@ async def caches(ctx):
     await send_current(ctx, "caches")
 
 
-@bot.command()
-async def status(ctx):
-    filled = sum(1 for _, value in bot.state.items() if value.get("hash"))
-    configured_sources = len(settings.sources)
-
-    embed = discord.Embed(
-        title="📊 Статус GTA News Bot",
-        description=(
-            "Режим: free source collection\n"
-            f"Заполненных разделов: {filled}/{len(bot.state)}\n"
-            f"Источников: {configured_sources}\n"
-            f"Период опроса: {settings.poll_minutes} мин\n"
-            f"Канал: {settings.channel_id}"
-        ),
-        color=0x95A5A6,
-        timestamp=discord.utils.utcnow(),
-    )
-    await ctx.send(embed=embed)
-
-
 @bot.command(name="help")
 async def help_command(ctx):
     embed = discord.Embed(
         title="❓ Команды",
         description=(
             "`!gta` — все текущие обновления\n"
-            "`!news` `!weekly`\n"
-            "`!status`\n\n"
+            "`!news` `!weekly`\n\n"
             "Бот работает без OpenAI."
         ),
         color=0x7289DA,

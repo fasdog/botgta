@@ -1,5 +1,13 @@
 [
   {
+    "name": "Rockstar Newswire",
+    "url": "https://www.rockstargames.com/newswire",
+    "category_hint": "news",
+    "title_selector": "title, h1, h2, h3",
+    "text_selector": "body",
+    "max_items": 1
+  },
+  {
     "name": "GTALens Gun Van",
     "url": "https://gtalens.com/map/gun-vans",
     "category_hint": "gunvan",

@@ -1,0 +1,8 @@
+
+GTA Online Discord Bot
+
+Переменные Railway:
+
+DISCORD_TOKEN=
+CHANNEL_ID=
+CHECK_INTERVAL_MINUTES=30

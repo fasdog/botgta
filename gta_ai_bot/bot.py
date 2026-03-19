@@ -11,7 +11,6 @@ from .collectors.webpage import ConfiguredWebCollector
 from .config import Settings
 from .models import CATEGORY_ORDER, META, now_text
 from .services.aggregator import GTAAIAggregator
-from .services.openai_client import OpenAIResponsesClient
 from .services.publisher import make_update_embed
 from .storage import StateStore
 
@@ -41,20 +40,10 @@ class GTAAIDiscordBot(commands.Bot):
         timeout = aiohttp.ClientTimeout(total=self.settings.request_timeout_seconds)
         self.http_session = aiohttp.ClientSession(
             timeout=timeout,
-            headers={"User-Agent": "gta-ai-discord-bot/2.2"},
+            headers={"User-Agent": "gta-ai-discord-bot/3.0"},
         )
 
-        if not self.settings.openai_api_key:
-            raise RuntimeError("OPENAI_API_KEY is not set")
-
-        client = OpenAIResponsesClient(
-            session=self.http_session,
-            api_key=self.settings.openai_api_key,
-            model=self.settings.openai_model,
-            base_url=self.settings.openai_base_url,
-            timeout_seconds=self.settings.request_timeout_seconds,
-        )
-        self.aggregator = GTAAIAggregator(client, self.settings.max_source_text_chars)
+        self.aggregator = GTAAIAggregator(self.settings.max_source_text_chars)
 
         self.poll_sources.change_interval(minutes=max(1, self.settings.poll_minutes))
         self.poll_sources.start()
@@ -74,8 +63,7 @@ class GTAAIDiscordBot(commands.Bot):
             return channel
 
         try:
-            fetched = await self.fetch_channel(self.settings.channel_id)
-            return fetched
+            return await self.fetch_channel(self.settings.channel_id)
         except Exception:
             log.exception("Failed to fetch target channel %s", self.settings.channel_id)
             return None
@@ -88,14 +76,13 @@ class GTAAIDiscordBot(commands.Bot):
             log.warning("Target channel %s not found", self.settings.channel_id)
         elif self.settings.send_startup_message:
             embed = discord.Embed(
-                title="🤖 GTA AI Bot запущен",
+                title="🤖 GTA News Bot запущен",
                 description=(
                     "Я онлайн.\n"
-                    "Бот сам собирает источники, анализирует их через ИИ и публикует\n"
-                    "обновления.\n\n"
+                    "Режим: полностью бесплатный, без OpenAI.\n"
+                    "Бот сам читает источники и публикует обновления.\n\n"
                     "**Команды просмотра:**\n"
-                    "`!gta` `!gunvan` `!dealers` `!stash` `!shipwreck` `!caches` `!news` `!weekly`\n"
-                    "`!status`"
+                    "`!gta` `!news` `!weekly` `!status`"
                 ),
                 color=0x2ECC71,
                 timestamp=discord.utils.utcnow(),
@@ -106,7 +93,10 @@ class GTAAIDiscordBot(commands.Bot):
                 log.exception("Failed to send startup message to channel %s", self.settings.channel_id)
 
         if self.settings.scan_on_startup:
-            await self.run_scan(reason="startup")
+            try:
+                await self.run_scan(reason="startup")
+            except Exception:
+                log.exception("Startup scan failed")
 
     async def collect_items(self):
         assert self.http_session is not None
@@ -150,7 +140,12 @@ class GTAAIDiscordBot(commands.Bot):
                 return 0
 
             assert self.aggregator is not None
-            updates = await self.aggregator.summarize(items)
+
+            try:
+                updates = await self.aggregator.summarize(items)
+            except Exception:
+                log.exception("Aggregator failed on %s scan", reason)
+                return 0
 
             published = 0
             for update in updates:
@@ -217,6 +212,16 @@ async def gta(ctx):
 
 
 @bot.command()
+async def news(ctx):
+    await send_current(ctx, "news")
+
+
+@bot.command()
+async def weekly(ctx):
+    await send_current(ctx, "weekly")
+
+
+@bot.command()
 async def gunvan(ctx):
     await send_current(ctx, "gunvan")
 
@@ -242,24 +247,14 @@ async def caches(ctx):
 
 
 @bot.command()
-async def news(ctx):
-    await send_current(ctx, "news")
-
-
-@bot.command()
-async def weekly(ctx):
-    await send_current(ctx, "weekly")
-
-
-@bot.command()
 async def status(ctx):
     filled = sum(1 for _, value in bot.state.items() if value.get("hash"))
     configured_sources = len(settings.sources)
 
     embed = discord.Embed(
-        title="📊 Статус GTA AI Bot",
+        title="📊 Статус GTA News Bot",
         description=(
-            "Режим: AI collection + summarization\n"
+            "Режим: free source collection\n"
             f"Заполненных разделов: {filled}/{len(bot.state)}\n"
             f"Источников: {configured_sources}\n"
             f"Период опроса: {settings.poll_minutes} мин\n"
@@ -276,11 +271,10 @@ async def help_command(ctx):
     embed = discord.Embed(
         title="❓ Команды",
         description=(
-            "`!gta` — все текущие AI-обновления\n"
-            "`!gunvan` `!dealers` `!stash` `!shipwreck` `!caches`\n"
-            "`!weekly` `!news`\n"
+            "`!gta` — все текущие обновления\n"
+            "`!news` `!weekly`\n"
             "`!status`\n\n"
-            "Ручных команд изменения данных больше нет."
+            "Бот работает без OpenAI."
         ),
         color=0x7289DA,
         timestamp=discord.utils.utcnow(),

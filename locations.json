@@ -1,0 +1,63 @@
+{
+  "gunvan": {
+    "points": [
+      [
+        62,
+        58
+      ]
+    ],
+    "label": "Gun Van"
+  },
+  "dealers": {
+    "points": [
+      [
+        26,
+        38
+      ],
+      [
+        51,
+        63
+      ],
+      [
+        74,
+        31
+      ]
+    ],
+    "label": "Street Dealers"
+  },
+  "stash": {
+    "points": [
+      [
+        44,
+        47
+      ]
+    ],
+    "label": "Stash House"
+  },
+  "shipwreck": {
+    "points": [
+      [
+        86,
+        70
+      ]
+    ],
+    "label": "Shipwreck"
+  },
+  "caches": {
+    "points": [
+      [
+        18,
+        77
+      ],
+      [
+        34,
+        82
+      ],
+      [
+        70,
+        76
+      ]
+    ],
+    "label": "Hidden Caches"
+  }
+}

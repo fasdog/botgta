@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from urllib.parse import urljoin
 
 import aiohttp
@@ -19,7 +20,13 @@ BROWSER_HEADERS = {
 
 
 def _clean_text(text: str) -> str:
-    return " ".join(text.split()).strip()
+    return " ".join(text.replace("\xa0", " ").split()).strip()
+
+
+def _truncate(text: str, limit: int = 5000) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
 
 
 class ConfiguredWebCollector:
@@ -35,6 +42,12 @@ class ConfiguredWebCollector:
                 return []
             html = await resp.text()
 
+        if "steamcommunity.com/app/" in url and "/allnews" in url:
+            return self._collect_steam_allnews(url, html)
+
+        return self._collect_generic(url, html)
+
+    def _collect_generic(self, url: str, html: str) -> list[SourceItem]:
         soup = BeautifulSoup(html, "html.parser")
 
         list_selector = self.source_config.get("list_selector")
@@ -70,17 +83,62 @@ class ConfiguredWebCollector:
             if not title and not text:
                 continue
 
-            if len(text) > 5000:
-                text = text[:4997].rstrip() + "..."
-
             results.append(
                 SourceItem(
                     source_name=source_name,
                     source_url=full_url,
                     title=title or source_name,
-                    text=text or title,
+                    text=_truncate(text or title),
                     category_hint=category_hint,
                 )
             )
 
         return results
+
+    def _collect_steam_allnews(self, url: str, html: str) -> list[SourceItem]:
+        soup = BeautifulSoup(html, "html.parser")
+        text = soup.get_text("\n", strip=True)
+        lines = [_clean_text(line) for line in text.splitlines()]
+        lines = [line for line in lines if line]
+
+        category_hint = self.source_config.get("category_hint")
+        source_name = self.source_config.get("name", url)
+
+        title_idx = None
+        for i, line in enumerate(lines):
+            if re.fullmatch(r"\d{1,2}\s+[A-Za-z]{3}(?:,\s+\d{4})?", line):
+                if i > 0 and len(lines[i - 1]) > 8:
+                    title_idx = i - 1
+                    break
+
+        if title_idx is None:
+            return []
+
+        title = lines[title_idx]
+        body_parts: list[str] = []
+
+        for line in lines[title_idx + 2 :]:
+            lower = line.lower()
+            if line == "Grand Theft Auto V Legacy":
+                break
+            if lower.startswith("see full event details"):
+                break
+            if re.fullmatch(r"\d{1,2}\s+[A-Za-z]{3}(?:,\s+\d{4})?", line):
+                break
+            if len(line) < 3:
+                continue
+            body_parts.append(line)
+
+        body = _truncate(_clean_text(" ".join(body_parts)))
+        if not title and not body:
+            return []
+
+        return [
+            SourceItem(
+                source_name=source_name,
+                source_url=url,
+                title=title or source_name,
+                text=body or title,
+                category_hint=category_hint,
+            )
+        ]

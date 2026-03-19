@@ -16,7 +16,10 @@ from .services.publisher import make_update_embed
 from .storage import StateStore
 
 log = logging.getLogger("gta_ai_bot")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 
 class GTAAIDiscordBot(commands.Bot):
@@ -38,7 +41,7 @@ class GTAAIDiscordBot(commands.Bot):
         timeout = aiohttp.ClientTimeout(total=self.settings.request_timeout_seconds)
         self.http_session = aiohttp.ClientSession(
             timeout=timeout,
-            headers={"User-Agent": "gta-ai-discord-bot/2.1"},
+            headers={"User-Agent": "gta-ai-discord-bot/2.2"},
         )
 
         if not self.settings.openai_api_key:
@@ -88,11 +91,13 @@ class GTAAIDiscordBot(commands.Bot):
                 title="🤖 GTA AI Bot запущен",
                 description=(
                     "Я онлайн.\n"
-                    "Бот сам собирает источники, анализирует их через ИИ и публикует обновления.\n\n"
-                    "Команды просмотра:\n"
-                    "`!gta` `!gunvan` `!dealers` `!stash` `!shipwreck` `!caches` `!news` `!weekly` `!status`"
+                    "Бот сам собирает источники, анализирует их через ИИ и публикует\n"
+                    "обновления.\n\n"
+                    "**Команды просмотра:**\n"
+                    "`!gta` `!gunvan` `!dealers` `!stash` `!shipwreck` `!caches` `!news` `!weekly`\n"
+                    "`!status`"
                 ),
-                color=0x22C55E,
+                color=0x2ECC71,
                 timestamp=discord.utils.utcnow(),
             )
             try:
@@ -106,9 +111,12 @@ class GTAAIDiscordBot(commands.Bot):
     async def collect_items(self):
         assert self.http_session is not None
 
+        log.info("Configured sources: %s", len(self.settings.sources))
+
         collectors = []
         for source in self.settings.sources:
             try:
+                log.info("Initializing collector for source: %s", source.get("name", source))
                 collectors.append(ConfiguredWebCollector(self.http_session, source))
             except Exception:
                 log.exception("Failed to initialize collector for source=%s", source)
@@ -117,10 +125,16 @@ class GTAAIDiscordBot(commands.Bot):
         for collector in collectors:
             try:
                 collected = await collector.collect()
+                log.info(
+                    "Collector %s returned %s items",
+                    collector.__class__.__name__,
+                    len(collected),
+                )
                 items.extend(collected)
             except Exception:
                 log.exception("Collector failed: %s", collector.__class__.__name__)
 
+        log.info("Total collected items: %s", len(items))
         return items[: self.settings.max_sources_per_cycle]
 
     async def run_scan(self, reason: str = "scheduled") -> int:
@@ -145,7 +159,9 @@ class GTAAIDiscordBot(commands.Bot):
                     continue
 
                 updated_at = now_text()
-                self.state[update.category] = update.to_storage_dict()
+                payload = update.to_storage_dict()
+                payload["updated_at"] = updated_at
+                self.state[update.category] = payload
                 self.store.save(self.state)
 
                 try:
@@ -237,7 +253,7 @@ async def weekly(ctx):
 
 @bot.command()
 async def status(ctx):
-    filled = sum(1 for key in bot.state if bot.state[key].get("hash"))
+    filled = sum(1 for _, value in bot.state.items() if value.get("hash"))
     configured_sources = len(settings.sources)
 
     embed = discord.Embed(
@@ -267,6 +283,7 @@ async def help_command(ctx):
             "Ручных команд изменения данных больше нет."
         ),
         color=0x7289DA,
+        timestamp=discord.utils.utcnow(),
     )
     await ctx.send(embed=embed)
 

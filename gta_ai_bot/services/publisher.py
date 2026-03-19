@@ -4,40 +4,70 @@ import discord
 
 
 CATEGORY_STYLES = {
-    "news": {"title": "📰 GTA News", "color": 0x3498DB},
-    "weekly": {"title": "💸 Weekly Update", "color": 0x2ECC71},
-    "gunvan": {"title": "🔫 Gun Van", "color": 0xE67E22},
-    "dealers": {"title": "💊 Street Dealers", "color": 0x9B59B6},
-    "stash": {"title": "🏠 Stash House", "color": 0xF1C40F},
-    "shipwreck": {"title": "🚢 Shipwreck", "color": 0x1ABC9C},
-    "caches": {"title": "📦 Hidden Caches", "color": 0x95A5A6},
+    "news": {"prefix": "📰", "color": 0x3498DB, "label": "Новости"},
+    "weekly": {"prefix": "💸", "color": 0x2ECC71, "label": "Еженедельное обновление"},
+    "gunvan": {"prefix": "🔫", "color": 0xE67E22, "label": "Gun Van"},
+    "dealers": {"prefix": "💊", "color": 0x9B59B6, "label": "Dealers"},
+    "stash": {"prefix": "🏠", "color": 0xF1C40F, "label": "Stash House"},
+    "shipwreck": {"prefix": "🚢", "color": 0x1ABC9C, "label": "Shipwreck"},
+    "caches": {"prefix": "📦", "color": 0x95A5A6, "label": "Caches"},
 }
 
 
-def _truncate(text: str, limit: int = 3800) -> str:
-    if not text:
-        return "Нет данных."
+def _smart_trim(text: str, limit: int = 3500) -> str:
+    text = text.strip()
     if len(text) <= limit:
         return text
-    return text[: limit - 3].rstrip() + "..."
+
+    cut = text[:limit]
+    last_break = max(cut.rfind("\n\n"), cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    if last_break > 500:
+        cut = cut[:last_break].rstrip()
+
+    return cut.rstrip() + "…"
+
+
+def _format_text(text: str) -> str:
+    parts = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if not parts:
+        return "Нет данных."
+
+    formatted: list[str] = []
+    for i, part in enumerate(parts):
+        is_heading = (
+            len(part) <= 100 and
+            (part.isupper() or part.endswith(":") or ("GTA $" in part and len(part) <= 120))
+        )
+
+        if is_heading:
+            formatted.append(f"**{part}**")
+        else:
+            formatted.append(part)
+
+        if i >= 4:
+            break
+
+    return _smart_trim("\n\n".join(formatted), 3500)
 
 
 def make_update_embed(update, updated_at: str) -> discord.Embed:
     style = CATEGORY_STYLES.get(
         update.category,
-        {"title": "📢 GTA Update", "color": 0x5865F2},
+        {"prefix": "📢", "color": 0x5865F2, "label": "Обновление"},
     )
 
+    title = f"{style['prefix']} {update.title or style['label']}"
+    text = _format_text(getattr(update, "text", "") or "")
+
     embed = discord.Embed(
-        title=update.title or style["title"],
-        description=_truncate(update.text),
+        title=title,
+        description=text,
         color=style["color"],
         timestamp=discord.utils.utcnow(),
     )
 
-    source_name = getattr(update, "source_name", "") or "Автоисточник"
+    source_name = getattr(update, "source_name", "") or "Источник"
     source_url = getattr(update, "source_url", "") or ""
-    sources = getattr(update, "sources", []) or []
 
     if source_url:
         embed.add_field(
@@ -45,24 +75,6 @@ def make_update_embed(update, updated_at: str) -> discord.Embed:
             value=f"[{source_name}]({source_url})",
             inline=False,
         )
-    elif sources:
-        embed.add_field(
-            name="Источники",
-            value="\n".join(f"• {item}" for item in sources[:5]),
-            inline=False,
-        )
-    else:
-        embed.add_field(
-            name="Источник",
-            value=source_name,
-            inline=False,
-        )
-
-    embed.add_field(
-        name="Категория",
-        value=update.category,
-        inline=True,
-    )
 
     embed.set_footer(text=f"Обновлено: {updated_at}")
     return embed

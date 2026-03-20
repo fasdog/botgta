@@ -11,7 +11,7 @@ from .collectors.webpage import ConfiguredWebCollector
 from .config import Settings
 from .models import CATEGORY_ORDER, META, now_text
 from .services.aggregator import GTAAIAggregator
-from .services.publisher import make_update_embed
+from .services.publisher import make_update_message
 from .storage import StateStore
 
 log = logging.getLogger("gta_ai_bot")

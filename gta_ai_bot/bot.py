@@ -158,7 +158,7 @@ class GTANewsBot(commands.Bot):
                 self.store.save(self.state)
 
                 try:
-                    await channel.send(embed=make_update_embed(update, updated_at))
+                    await channel.send(make_update_message(update, updated_at))
                     published += 1
                 except Exception:
                     log.exception("Failed to publish update for category=%s", update.category)

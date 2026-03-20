@@ -1,80 +1,115 @@
 from __future__ import annotations
 
-import discord
+import re
 
 
-CATEGORY_STYLES = {
-    "news": {"prefix": "📰", "color": 0x3498DB, "label": "Новости"},
-    "weekly": {"prefix": "💸", "color": 0x2ECC71, "label": "Еженедельное обновление"},
-    "gunvan": {"prefix": "🔫", "color": 0xE67E22, "label": "Gun Van"},
-    "dealers": {"prefix": "💊", "color": 0x9B59B6, "label": "Dealers"},
-    "stash": {"prefix": "🏠", "color": 0xF1C40F, "label": "Stash House"},
-    "shipwreck": {"prefix": "🚢", "color": 0x1ABC9C, "label": "Shipwreck"},
-    "caches": {"prefix": "📦", "color": 0x95A5A6, "label": "Caches"},
+CATEGORY_LABELS = {
+    "news": "📰 Новости GTA Online",
+    "weekly": "💸 Еженедельное обновление",
+    "gunvan": "🔫 Gun Van",
+    "dealers": "💊 Street Dealers",
+    "stash": "🏠 Stash House",
+    "shipwreck": "🚢 Shipwreck",
+    "caches": "📦 Caches",
 }
 
 
-def _smart_trim(text: str, limit: int = 3500) -> str:
+def _clean_line(line: str) -> str:
+    return re.sub(r"\s+", " ", line).strip()
+
+
+def _smart_trim(text: str, limit: int = 1800) -> str:
     text = text.strip()
     if len(text) <= limit:
         return text
 
     cut = text[:limit]
     last_break = max(cut.rfind("\n\n"), cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
-    if last_break > 500:
+    if last_break > 400:
         cut = cut[:last_break].rstrip()
 
     return cut.rstrip() + "…"
 
 
-def _format_text(text: str) -> str:
+def _looks_like_heading(line: str) -> bool:
+    line = line.strip()
+    if not line:
+        return False
+    return (
+        len(line) <= 110
+        and (
+            line.isupper()
+            or line.endswith(":")
+            or ("GTA $" in line and len(line) <= 120)
+        )
+    )
+
+
+def _split_paragraphs(text: str) -> list[str]:
+    text = text.replace("\r\n", "\n").strip()
     parts = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if parts:
+        return parts
+
+    lines = [_clean_line(x) for x in text.split("\n") if _clean_line(x)]
+    return lines
+
+
+def _format_body(text: str) -> str:
+    parts = _split_paragraphs(text)
     if not parts:
         return "Нет данных."
 
-    formatted: list[str] = []
-    for i, part in enumerate(parts):
-        is_heading = (
-            len(part) <= 100 and
-            (part.isupper() or part.endswith(":") or ("GTA $" in part and len(part) <= 120))
-        )
+    out: list[str] = []
+    normal_count = 0
 
-        if is_heading:
-            formatted.append(f"**{part}**")
-        else:
-            formatted.append(part)
+    for part in parts:
+        if _looks_like_heading(part):
+            out.append(f"**{part}**")
+            continue
 
-        if i >= 4:
+        if part.startswith(("• ", "- ", "— ")):
+            out.append(part)
+            continue
+
+        out.append(part)
+        normal_count += 1
+
+        if normal_count >= 5:
             break
 
-    return _smart_trim("\n\n".join(formatted), 3500)
+    return _smart_trim("\n\n".join(out), 1800)
 
 
-def make_update_embed(update, updated_at: str) -> discord.Embed:
-    style = CATEGORY_STYLES.get(
-        update.category,
-        {"prefix": "📢", "color": 0x5865F2, "label": "Обновление"},
-    )
+def make_update_message(update, updated_at: str) -> str:
+    label = CATEGORY_LABELS.get(update.category, "📢 Обновление")
+    title = (getattr(update, "title", "") or "Без названия").strip()
+    text = _format_body(getattr(update, "text", "") or "")
+    source_name = (getattr(update, "source_name", "") or "Источник").strip()
+    source_url = (getattr(update, "source_url", "") or "").strip()
 
-    title = f"{style['prefix']} {update.title or style['label']}"
-    text = _format_text(getattr(update, "text", "") or "")
-
-    embed = discord.Embed(
-        title=title,
-        description=text,
-        color=style["color"],
-        timestamp=discord.utils.utcnow(),
-    )
-
-    source_name = getattr(update, "source_name", "") or "Источник"
-    source_url = getattr(update, "source_url", "") or ""
+    lines = [
+        f"{label}",
+        "",
+        f"**{title}**",
+        "",
+        text,
+    ]
 
     if source_url:
-        embed.add_field(
-            name="Источник",
-            value=f"[{source_name}]({source_url})",
-            inline=False,
+        lines.extend(
+            [
+                "",
+                f"🔗 Источник: {source_name}",
+                source_url,
+            ]
         )
 
-    embed.set_footer(text=f"Обновлено: {updated_at}")
-    return embed
+    lines.extend(
+        [
+            "",
+            f"_Обновлено: {updated_at}_",
+        ]
+    )
+
+    return "\n".join(lines)

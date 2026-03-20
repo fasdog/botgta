@@ -9,14 +9,19 @@ from ..models import SourceItem
 
 def _clean_text(text: str) -> str:
     text = text.replace("\xa0", " ")
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 def _truncate(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
-    return text[: limit - 3].rstrip() + "..."
+    cut = text[:limit]
+    last_break = max(cut.rfind("\n\n"), cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    if last_break > 500:
+        cut = cut[:last_break]
+    return cut.rstrip() + "…"
 
 
 def _detect_category(item: SourceItem) -> str:
@@ -27,13 +32,15 @@ def _detect_category(item: SourceItem) -> str:
     text = f"{item.title} {item.text}".lower()
 
     weekly_markers = [
-        "gta online bonuses",
         "bonuses and discounts",
         "weekly",
         "event week",
         "на этой неделе",
         "бонусы",
         "скидки",
+        "утроенные награды",
+        "двойные награды",
+        "тройные награды",
     ]
     if any(marker in text for marker in weekly_markers):
         return "weekly"
@@ -67,7 +74,7 @@ class AggregatedUpdate:
 
 
 class GTAAIAggregator:
-    def __init__(self, max_source_text_chars: int = 12000):
+    def __init__(self, max_source_text_chars: int = 3000):
         self.max_source_text_chars = max_source_text_chars
 
     async def summarize(self, items: list[SourceItem]) -> list[AggregatedUpdate]:
